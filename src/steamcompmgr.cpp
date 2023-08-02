@@ -6017,55 +6017,7 @@ spawn_client( char **argv )
 #warning "Changing reaper process for children is not supported on this platform"
 #endif
 
-	std::string strNewPreload;
-	char *pchPreloadCopy = nullptr;
-	const char *pchCurrentPreload = getenv( "LD_PRELOAD" );
-	bool bFirst = true;
-
-	if ( pchCurrentPreload != nullptr )
-	{
-		pchPreloadCopy = strdup( pchCurrentPreload );
-
-		// First replace all the separators in our copy with terminators
-		for ( uint32_t i = 0; i < strlen( pchCurrentPreload ); i++ )
-		{
-			if ( pchPreloadCopy[ i ] == ' ' || pchPreloadCopy[ i ] == ':' )
-			{
-				pchPreloadCopy[ i ] = '\0';
-			}
-		}
-
-		// Then walk it again and find all the substrings
-		uint32_t i = 0;
-		while ( i < strlen( pchCurrentPreload ) )
-		{
-			// If there's a string and it's not gameoverlayrenderer, append it to our new LD_PRELOAD
-			if ( pchPreloadCopy[ i ] != '\0' )
-			{
-				if ( strstr( pchPreloadCopy + i, "gameoverlayrenderer.so" ) == nullptr )
-				{
-					if ( bFirst == false )
-					{
-						strNewPreload.append( ":" );
-					}
-					else
-					{
-						bFirst = false;
-					}
-
-					strNewPreload.append( pchPreloadCopy + i );
-				}
-
-				i += strlen( pchPreloadCopy + i );
-			}
-			else
-			{
-				i++;
-			}
-		}
-
-		free( pchPreloadCopy );
-	}
+	const char *gamescope_ld_preload = getenv( "GAMESCOPE_LD_PRELOAD" );
 
 	pid_t pid = fork();
 
@@ -6088,19 +6040,13 @@ spawn_client( char **argv )
 		restore_fd_limit();
 
 		// Set modified LD_PRELOAD if needed
-		if ( pchCurrentPreload != nullptr )
+		if ( *gamescope_ld_preload != '\0' )
 		{
-			if ( strNewPreload.empty() == false )
-			{
-				setenv( "LD_PRELOAD", strNewPreload.c_str(), 1 );
-			}
-			else
-			{
-				unsetenv( "LD_PRELOAD" );
-			}
+			setenv( "LD_PRELOAD", gamescope_ld_preload, 1);
 		}
 
 		unsetenv( "ENABLE_VKBASALT" );
+		unsetenv( "GAMESCOPE_LD_PRELOAD" );
 
 		execvp( argv[ 0 ], argv );
 

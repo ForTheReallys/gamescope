@@ -466,8 +466,72 @@ static EStreamColorspace parse_colorspace_string( const char *pszStr )
 int g_nPreferredOutputWidth = 0;
 int g_nPreferredOutputHeight = 0;
 
+static void chainload(char **argv)
+{
+	std::string strNewPreload;
+	char *pchPreloadCopy = nullptr;
+	const char *pchCurrentPreload = getenv( "LD_PRELOAD" );
+	bool bFirst = true;
+	//Set environment variable to empty so we don't loop indefinitely
+	setenv("GAMESCOPE_LD_PRELOAD", "", 1);
+
+	if ( pchCurrentPreload != nullptr )
+	{
+		pchPreloadCopy = strdup( pchCurrentPreload );
+
+		// First replace all the separators in our copy with terminators
+		for ( uint32_t i = 0; i < strlen( pchCurrentPreload ); i++ )
+		{
+			if ( pchPreloadCopy[ i ] == ' ' || pchPreloadCopy[ i ] == ':' )
+			{
+				pchPreloadCopy[ i ] = '\0';
+			}
+		}
+
+		// Then walk it again and find all the substrings
+		uint32_t i = 0;
+		while ( i < strlen( pchCurrentPreload ) )
+		{
+			// If there's a string and it's not gameoverlayrenderer, append it to our new LD_PRELOAD
+			if ( pchPreloadCopy[ i ] != '\0' )
+			{
+				if ( strstr( pchPreloadCopy + i, "gameoverlayrenderer.so" ) == nullptr )
+				{
+					if ( bFirst == false )
+					{
+						strNewPreload.append( ":" );
+					}
+					else
+					{
+						bFirst = false;
+					}
+
+					strNewPreload.append( pchPreloadCopy + i );
+				}
+
+				i += strlen( pchPreloadCopy + i );
+			}
+			else
+			{
+				i++;
+			}
+		}
+
+		setenv("LD_PRELOAD", strNewPreload.c_str(), 1);
+		setenv("GAMESCOPE_LD_PRELOAD", pchCurrentPreload, 1);
+
+		free( pchPreloadCopy );
+	}
+	execv(argv[0], argv);
+}
+
 int main(int argc, char **argv)
 {
+	if (!getenv("GAMESCOPE_LD_PRELOAD"))
+	{
+		chainload(argv);
+	}
+
 	// Force disable this horrible broken layer.
 	setenv("DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1", "1", 1);
 
